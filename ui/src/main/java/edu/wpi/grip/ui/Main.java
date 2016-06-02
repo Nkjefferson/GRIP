@@ -10,11 +10,12 @@ import com.sun.javafx.application.PlatformImpl;
 import edu.wpi.grip.core.GRIPCoreModule;
 import edu.wpi.grip.core.PipelineRunner;
 import edu.wpi.grip.core.events.UnexpectedThrowableEvent;
+import edu.wpi.grip.core.operations.CVOperations;
 import edu.wpi.grip.core.operations.Operations;
 import edu.wpi.grip.core.operations.network.GRIPNetworkModule;
 import edu.wpi.grip.core.serialization.Project;
+import edu.wpi.grip.core.sources.GRIPSourcesHardwareModule;
 import edu.wpi.grip.core.util.SafeShutdown;
-import edu.wpi.grip.generated.CVOperations;
 import edu.wpi.grip.ui.util.DPIUtility;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -22,6 +23,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
+import javafx.scene.text.Font;
 import javafx.stage.Stage;
 
 import javax.inject.Inject;
@@ -38,6 +40,7 @@ public class Main extends Application {
     @Inject private PipelineRunner pipelineRunner;
     @Inject private Project project;
     @Inject private Operations operations;
+    @Inject private CVOperations cvOperations;
     @Inject private Logger logger;
 
     /**
@@ -61,14 +64,20 @@ public class Main extends Application {
 
         if (parameters.contains("--headless")) {
             // If --headless was specified on the command line, run in headless mode (only use the core module)
-            injector = Guice.createInjector(new GRIPCoreModule(), new GRIPNetworkModule());
+            injector = Guice.createInjector(new GRIPCoreModule(), new GRIPNetworkModule(), new GRIPSourcesHardwareModule());
             injector.injectMembers(this);
 
             parameters.remove("--headless");
         } else {
             // Otherwise, run with both the core and UI modules, and show the JavaFX stage
-            injector = Guice.createInjector(Modules.override(new GRIPCoreModule(), new GRIPNetworkModule()).with(new GRIPUIModule()));
+            injector = Guice.createInjector(Modules.override(new GRIPCoreModule(), new GRIPNetworkModule(), new GRIPSourcesHardwareModule()).with(new GRIPUIModule()));
             injector.injectMembers(this);
+
+            System.setProperty("prism.lcdtext", "false");
+            Font.loadFont(this.getClass().getResource("roboto/Roboto-Regular.ttf").openStream(), -1);
+            Font.loadFont(this.getClass().getResource("roboto/Roboto-Bold.ttf").openStream(), -1);
+            Font.loadFont(this.getClass().getResource("roboto/Roboto-Italic.ttf").openStream(), -1);
+            Font.loadFont(this.getClass().getResource("roboto/Roboto-BoldItalic.ttf").openStream(), -1);
 
             root = FXMLLoader.load(Main.class.getResource("MainWindow.fxml"), null, null, injector::getInstance);
             root.setStyle("-fx-font-size: " + DPIUtility.FONT_SIZE + "px");
@@ -82,7 +91,7 @@ public class Main extends Application {
         }
 
         operations.addOperations();
-        CVOperations.addOperations(eventBus);
+        cvOperations.addOperations();
 
         // If there was a file specified on the command line, open it immediately
         if (!parameters.isEmpty()) {
